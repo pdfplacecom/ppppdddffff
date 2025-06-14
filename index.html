@@ -1,12 +1,11 @@
+
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PDF PLACE</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" type="text/css" />
+  <link href="style.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
   <!-- Welcome Popup -->
@@ -86,7 +85,7 @@
         
         <div class="demo-credentials">
           <p class="demo-title">Demo Access:</p>
-          <p class="demo-user">Use any email and password to create a new account</p>
+          <p class="demo-user">Use any email and password for demo access</p>
         </div>
       </div>
     </div>
@@ -208,6 +207,7 @@
         <h2>📚 Your PDFs</h2>
         <div class="files-header">
           <button onclick="loadPDFs()">🔄 Refresh List</button>
+          <button onclick="clearStorageSpace()" class="secondary-btn">🧹 Clear Storage Space</button>
           <div class="storage-info">
             <span id="storageUsage">Storage: Loading...</span>
           </div>
@@ -310,7 +310,6 @@
     <p>Loading...</p>
   </div>
   
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="script.js"></script>
 </body>
 </html>

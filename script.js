@@ -1,8 +1,35 @@
+
 // Global Variables
 let currentUser = null;
 let isAdmin = false;
 let currentPreviewFile = null;
 let isDarkTheme = false;
+let samplePDFs = [
+  {
+    id: 1,
+    filename: "NCERT Mathematics Class 12.pdf",
+    category: "ncert",
+    upload_date: "2024-01-15",
+    size: 15728640,
+    download_count: 245
+  },
+  {
+    id: 2,
+    filename: "JEE Main Physics PYQ 2023.pdf",
+    category: "pyqs",
+    upload_date: "2024-01-12",
+    size: 8945632,
+    download_count: 189
+  },
+  {
+    id: 3,
+    filename: "Chemistry Mock Test - Organic.pdf",
+    category: "mocktest",
+    upload_date: "2024-01-10",
+    size: 5242880,
+    download_count: 156
+  }
+];
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -26,6 +53,20 @@ function initializeApp() {
         isDarkTheme = true;
     }
     
+    // Load uploaded PDFs from localStorage
+    const uploadedPDFs = localStorage.getItem('uploadedPDFs');
+    if (uploadedPDFs) {
+        try {
+            const parsed = JSON.parse(uploadedPDFs);
+            if (Array.isArray(parsed)) {
+                samplePDFs.length = 0; // Clear existing
+                samplePDFs.push(...parsed); // Add uploaded PDFs
+            }
+        } catch (error) {
+            console.error('Error loading uploaded PDFs:', error);
+        }
+    }
+    
     // Show welcome popup on first visit
     const hasVisited = localStorage.getItem('hasVisited');
     if (!hasVisited) {
@@ -40,9 +81,17 @@ function initializeApp() {
 }
 
 function checkLoginStatus() {
-    // This would normally check server session, but we'll handle it client-side for now
-    // In production, this should be a server-side check
-    showMainPage();
+    // Check if user was previously logged in
+    const savedUser = localStorage.getItem('currentUser');
+    const savedAdmin = localStorage.getItem('isAdmin');
+    
+    if (savedUser) {
+        currentUser = savedUser;
+        isAdmin = savedAdmin === 'true';
+        showMainPage();
+    } else {
+        showMainPage();
+    }
 }
 
 // Welcome Popup Functions
@@ -108,31 +157,30 @@ function login(event) {
     try {
         showLoading(true);
         
-        const form = document.getElementById('loginForm');
-        const formData = new FormData(form);
+        const email = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
         
-        fetch('/login', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                currentUser = data.user_email;
-                isAdmin = data.is_admin;
-                showMainApp();
-                showSuccess('Login successful!');
-            } else {
-                showError(data.message || 'Login failed');
-            }
-        })
-        .catch(error => {
-            console.error('Login error:', error);
-            showError('Login failed: ' + error.message);
-        })
-        .finally(() => {
+        if (!email || !password) {
+            showError('Please enter both email and password');
             showLoading(false);
-        });
+            return;
+        }
+        
+        // Simulate login delay
+        setTimeout(() => {
+            // Demo login logic
+            currentUser = email;
+            isAdmin = email === 'ak763145918@gmail.com' && password === '76730';
+            
+            // Save login state
+            localStorage.setItem('currentUser', currentUser);
+            localStorage.setItem('isAdmin', isAdmin.toString());
+            
+            showMainApp();
+            showSuccess('Login successful!');
+            showLoading(false);
+        }, 1000);
+        
     } catch (error) {
         console.error('Login error:', error);
         showError('Login failed: ' + error.message);
@@ -144,27 +192,19 @@ function logout() {
     try {
         showLoading(true);
         
-        fetch('/logout', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                currentUser = null;
-                isAdmin = false;
-                showMainPage(); // Return to main page with login button
-                showSuccess('Logged out successfully!');
-            } else {
-                showError('Logout failed');
-            }
-        })
-        .catch(error => {
-            console.error('Logout error:', error);
-            showError('Logout failed: ' + error.message);
-        })
-        .finally(() => {
+        setTimeout(() => {
+            currentUser = null;
+            isAdmin = false;
+            
+            // Clear login state
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isAdmin');
+            
+            showMainPage();
+            showSuccess('Logged out successfully!');
             showLoading(false);
-        });
+        }, 500);
+        
     } catch (error) {
         console.error('Logout error:', error);
         showError('Logout failed: ' + error.message);
@@ -318,8 +358,8 @@ function uploadPDF(event) {
             return;
         }
         
-        const form = document.getElementById('uploadForm');
         const fileInput = document.getElementById('pdfFile');
+        const categorySelect = document.getElementById('categorySelect');
         const statusDiv = document.getElementById('uploadStatus');
         
         if (!fileInput.files[0]) {
@@ -341,32 +381,88 @@ function uploadPDF(event) {
         showLoading(true);
         statusDiv.innerHTML = '<div class="loading-spinner"></div> Uploading...';
         
-        const formData = new FormData(form);
-        
-        fetch('/upload', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess(data.message || 'File uploaded successfully!');
-                form.reset();
+        // Read file and create new PDF entry
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                // Check if we have a valid result
+                if (!e.target || !e.target.result) {
+                    throw new Error('Failed to read file data');
+                }
+                
+                // Create new PDF object (without storing large file data)
+                const newPDF = {
+                    id: Date.now(),
+                    filename: file.name,
+                    category: categorySelect.value,
+                    upload_date: new Date().toLocaleDateString(),
+                    size: file.size,
+                    download_count: 0,
+                    file_data: file.size < 1 * 1024 * 1024 ? e.target.result : null // Only store files under 1MB
+                };
+                
+                // Check current storage before adding
+                const currentStorageSize = JSON.stringify(samplePDFs).length;
+                const newItemSize = JSON.stringify(newPDF).length;
+                const maxStorageSize = 5 * 1024 * 1024; // 5MB limit
+                
+                if (currentStorageSize + newItemSize > maxStorageSize) {
+                    // Create PDF without file data to save space
+                    newPDF.file_data = null;
+                    showSuccess('File uploaded successfully! (Preview not available due to size)');
+                } else {
+                    showSuccess('File uploaded successfully!');
+                }
+                
+                // Add to sample PDFs array
+                samplePDFs.push(newPDF);
+                
+                // Try to save to localStorage with error handling
+                try {
+                    localStorage.setItem('uploadedPDFs', JSON.stringify(samplePDFs));
+                } catch (storageError) {
+                    // Remove the file from array if storage fails
+                    samplePDFs.pop();
+                    
+                    if (storageError.name === 'QuotaExceededError') {
+                        // Try again without file data
+                        newPDF.file_data = null;
+                        samplePDFs.push(newPDF);
+                        try {
+                            localStorage.setItem('uploadedPDFs', JSON.stringify(samplePDFs));
+                            showSuccess('File uploaded successfully! (Preview not available due to storage limitations)');
+                        } catch (secondError) {
+                            samplePDFs.pop();
+                            showError('Storage quota exceeded. Please clear some files first.');
+                            showLoading(false);
+                            return;
+                        }
+                    } else {
+                        throw storageError;
+                    }
+                }
+                
+                document.getElementById('uploadForm').reset();
                 statusDiv.innerHTML = '';
                 loadPDFs(); // Refresh file list
-            } else {
-                showError(data.message || 'Upload failed');
-                statusDiv.innerHTML = '';
+                loadStorageInfo(); // Update storage info
+                showLoading(false);
+                
+            } catch (error) {
+                console.error('File processing error:', error);
+                showError('Failed to process file: ' + (error.message || 'Unknown error'));
+                showLoading(false);
             }
-        })
-        .catch(error => {
-            console.error('Upload error:', error);
-            showError('Upload failed: ' + error.message);
-            statusDiv.innerHTML = '';
-        })
-        .finally(() => {
+        };
+        
+        reader.onerror = function(error) {
+            console.error('FileReader error:', error);
+            showError('Failed to read file. Please try again.');
             showLoading(false);
-        });
+        };
+        
+        reader.readAsDataURL(file);
+        
     } catch (error) {
         console.error('Upload error:', error);
         showError('Upload failed: ' + error.message);
@@ -377,26 +473,23 @@ function uploadPDF(event) {
 // File Management Functions
 function loadPDFs() {
     try {
+        if (!currentUser) {
+            disableFeatures();
+            return;
+        }
+        
         const category = document.getElementById('categoryFilter').value;
-        const search = document.getElementById('searchInput').value;
+        const search = document.getElementById('searchInput').value.toLowerCase();
         
-        const params = new URLSearchParams();
-        if (category) params.append('category', category);
-        if (search) params.append('search', search);
-        
-        fetch('/files?' + params.toString())
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayPDFs(data.files);
-            } else {
-                showError(data.message || 'Failed to load files');
-            }
-        })
-        .catch(error => {
-            console.error('Error loading PDFs:', error);
-            showError('Failed to load files: ' + error.message);
+        // Filter sample PDFs
+        let filteredPDFs = samplePDFs.filter(pdf => {
+            const matchesCategory = !category || pdf.category === category;
+            const matchesSearch = !search || pdf.filename.toLowerCase().includes(search);
+            return matchesCategory && matchesSearch;
         });
+        
+        displayPDFs(filteredPDFs);
+        
     } catch (error) {
         console.error('Error loading PDFs:', error);
         showError('Failed to load files: ' + error.message);
@@ -466,19 +559,38 @@ function previewPDF(fileId, filename) {
         loading.style.display = 'block';
         iframe.style.display = 'none';
         
-        // Load PDF
-        iframe.src = `/preview/${fileId}`;
+        // Find the PDF file
+        const pdfFile = samplePDFs.find(pdf => pdf.id === fileId);
         
-        iframe.onload = function() {
-            loading.style.display = 'none';
-            iframe.style.display = 'block';
-        };
+        setTimeout(() => {
+            if (pdfFile && pdfFile.file_data) {
+                // Use actual uploaded file data
+                iframe.src = pdfFile.file_data;
+                loading.style.display = 'none';
+                iframe.style.display = 'block';
+            } else if (pdfFile && !pdfFile.file_data) {
+                // Show informative message for files without stored data
+                loading.innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <h3>📄 ${escapeHtml(filename)}</h3>
+                        <p>⚠️ File preview not available due to storage limitations.</p>
+                        <p>File size: ${formatFileSize(pdfFile.size)}</p>
+                        <button onclick="downloadPDF(${fileId}, '${escapeHtml(filename)}')" 
+                                style="padding: 10px 20px; background: var(--success-color); color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 10px;">
+                            📥 Download to View
+                        </button>
+                    </div>
+                `;
+                loading.style.display = 'block';
+                iframe.style.display = 'none';
+            } else {
+                // Use sample PDF for demo files and original sample data
+                iframe.src = 'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMiAwIFIKPj4KZW5kb2JqCjIgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFszIDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2UKL1BhcmVudCAyIDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMSA0IDAgUgo+Pgo+PgovTWVkaWFCb3ggWzAgMCA2MTIgNzkyXQovQ29udGVudHMgNSAwIFIKPj4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iago1IDAgb2JqCjw8Ci9MZW5ndGggNDQKPj4Kc3RyZWFtCkJUCi9GMSAyNCBUZgoxMDAgNzAwIFRkCihTYW1wbGUgUERGKSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0NSAwMDAwMCBuIAowMDAwMDAwMzI0IDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNgovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNDE4CiUlRU9G';
+                loading.style.display = 'none';
+                iframe.style.display = 'block';
+            }
+        }, 1000);
         
-        iframe.onerror = function() {
-            loading.style.display = 'none';
-            showError('Failed to load PDF preview');
-            closePreview();
-        };
     } catch (error) {
         console.error('Preview error:', error);
         showError('Failed to preview PDF: ' + error.message);
@@ -502,16 +614,49 @@ function closePreview() {
 
 function downloadCurrentPDF() {
     if (currentPreviewFile) {
-        window.open(`/download/${currentPreviewFile}`, '_blank');
+        downloadPDF(currentPreviewFile, 'sample.pdf');
     }
 }
 
 function downloadPDF(fileId, filename) {
     try {
-        // Track download
-        window.open(`/download/${fileId}`, '_blank');
+        const pdfFile = samplePDFs.find(pdf => pdf.id === fileId);
         
-        // Refresh downloads list if on downloads tab
+        if (pdfFile && pdfFile.file_data) {
+            // Create download link for actual uploaded file
+            const link = document.createElement('a');
+            link.href = pdfFile.file_data;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showSuccess(`Downloaded ${filename} successfully!`);
+        } else if (pdfFile && !pdfFile.file_data && pdfFile.size >= 2 * 1024 * 1024) {
+            // File was too large to store
+            showError(`File ${filename} was too large to store. Original file data not available.`);
+        } else {
+            // Simulate download for demo files
+            showSuccess(`Downloading ${filename}...`);
+        }
+        
+        // Update download count
+        if (pdfFile) {
+            pdfFile.download_count++;
+            localStorage.setItem('uploadedPDFs', JSON.stringify(samplePDFs));
+        }
+        
+        // Add to download history
+        let downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+        downloads.push({
+            file_id: fileId,
+            filename: filename,
+            download_date: new Date().toLocaleDateString(),
+            category: pdfFile?.category || 'others'
+        });
+        localStorage.setItem('downloads', JSON.stringify(downloads));
+        
+        // Refresh displays
+        loadPDFs();
         if (document.getElementById('downloadsTab').classList.contains('active')) {
             setTimeout(() => {
                 loadDownloads();
@@ -536,25 +681,21 @@ function deletePDF(fileId) {
     try {
         showLoading(true);
         
-        fetch(`/delete/${fileId}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess(data.message || 'File deleted successfully');
-                loadPDFs(); // Refresh file list
-            } else {
-                showError(data.message || 'Delete failed');
+        setTimeout(() => {
+            // Remove from sample data
+            const index = samplePDFs.findIndex(pdf => pdf.id === fileId);
+            if (index > -1) {
+                samplePDFs.splice(index, 1);
+                // Update localStorage
+                localStorage.setItem('uploadedPDFs', JSON.stringify(samplePDFs));
             }
-        })
-        .catch(error => {
-            console.error('Delete error:', error);
-            showError('Delete failed: ' + error.message);
-        })
-        .finally(() => {
+            
+            showSuccess('File deleted successfully');
+            loadPDFs(); // Refresh file list
+            loadStorageInfo(); // Update storage info
             showLoading(false);
-        });
+        }, 1000);
+        
     } catch (error) {
         console.error('Delete error:', error);
         showError('Delete failed: ' + error.message);
@@ -578,23 +719,37 @@ function toggleFullscreen() {
 // Downloads Functions
 function loadDownloads() {
     try {
-        const filter = document.getElementById('downloadsFilter').value;
-        const params = new URLSearchParams();
-        if (filter) params.append('filter', filter);
+        if (!currentUser) {
+            disableFeatures();
+            return;
+        }
         
-        fetch('/downloads?' + params.toString())
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayDownloads(data.downloads);
-            } else {
-                showError(data.message || 'Failed to load downloads');
-            }
-        })
-        .catch(error => {
-            console.error('Error loading downloads:', error);
-            showError('Failed to load downloads: ' + error.message);
-        });
+        const downloads = JSON.parse(localStorage.getItem('downloads') || '[]');
+        const filter = document.getElementById('downloadsFilter').value;
+        
+        let filteredDownloads = downloads;
+        
+        if (filter) {
+            const now = new Date();
+            filteredDownloads = downloads.filter(download => {
+                const downloadDate = new Date(download.download_date);
+                switch (filter) {
+                    case 'today':
+                        return downloadDate.toDateString() === now.toDateString();
+                    case 'week':
+                        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        return downloadDate >= weekAgo;
+                    case 'month':
+                        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        return downloadDate >= monthAgo;
+                    default:
+                        return true;
+                }
+            });
+        }
+        
+        displayDownloads(filteredDownloads);
+        
     } catch (error) {
         console.error('Error loading downloads:', error);
         showError('Failed to load downloads: ' + error.message);
@@ -638,31 +793,12 @@ function clearDownloadHistory() {
     }
     
     try {
-        showLoading(true);
-        
-        fetch('/clear_downloads', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess(data.message || 'Download history cleared');
-                loadDownloads();
-            } else {
-                showError(data.message || 'Failed to clear history');
-            }
-        })
-        .catch(error => {
-            console.error('Clear downloads error:', error);
-            showError('Failed to clear history: ' + error.message);
-        })
-        .finally(() => {
-            showLoading(false);
-        });
+        localStorage.removeItem('downloads');
+        showSuccess('Download history cleared');
+        loadDownloads();
     } catch (error) {
         console.error('Clear downloads error:', error);
         showError('Failed to clear history: ' + error.message);
-        showLoading(false);
     }
 }
 
@@ -673,37 +809,41 @@ function submitComment(event) {
     }
     
     try {
-        const form = document.getElementById('feedbackForm');
-        const formData = new FormData(form);
+        if (!currentUser) {
+            showError('Please login to submit feedback');
+            return;
+        }
         
-        if (!formData.get('text').trim()) {
+        const text = document.getElementById('commentText').value.trim();
+        const category = document.getElementById('commentCategory').value;
+        
+        if (!text) {
             showError('Please enter your feedback');
             return;
         }
         
         showLoading(true);
         
-        fetch('/comments', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showSuccess(data.message || 'Feedback submitted successfully');
-                form.reset();
-                loadComments();
-            } else {
-                showError(data.message || 'Failed to submit feedback');
-            }
-        })
-        .catch(error => {
-            console.error('Comment submission error:', error);
-            showError('Failed to submit feedback: ' + error.message);
-        })
-        .finally(() => {
+        setTimeout(() => {
+            // Save comment
+            let comments = JSON.parse(localStorage.getItem('comments') || '[]');
+            comments.push({
+                id: Date.now(),
+                user_email: currentUser,
+                text: text,
+                category: category,
+                created_at: new Date().toLocaleString(),
+                is_resolved: false,
+                admin_reply: null
+            });
+            localStorage.setItem('comments', JSON.stringify(comments));
+            
+            showSuccess('Feedback submitted successfully');
+            document.getElementById('feedbackForm').reset();
+            loadComments();
             showLoading(false);
-        });
+        }, 1000);
+        
     } catch (error) {
         console.error('Comment submission error:', error);
         showError('Failed to submit feedback: ' + error.message);
@@ -713,19 +853,14 @@ function submitComment(event) {
 
 function loadComments() {
     try {
-        fetch('/comments')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                displayComments(data.comments);
-            } else {
-                showError(data.message || 'Failed to load comments');
-            }
-        })
-        .catch(error => {
-            console.error('Error loading comments:', error);
-            showError('Failed to load comments: ' + error.message);
-        });
+        if (!currentUser) {
+            disableFeatures();
+            return;
+        }
+        
+        const comments = JSON.parse(localStorage.getItem('comments') || '[]');
+        displayComments(comments);
+        
     } catch (error) {
         console.error('Error loading comments:', error);
         showError('Failed to load comments: ' + error.message);
@@ -758,21 +893,50 @@ function displayComments(comments) {
 // Storage Info
 function loadStorageInfo() {
     try {
-        fetch('/storage_info')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const storageElement = document.getElementById('storageUsage');
-                if (storageElement) {
-                    storageElement.textContent = `Storage: ${data.total_size_mb}MB (${data.total_files} files)`;
-                }
-            }
-        })
-        .catch(error => {
-            console.error('Error loading storage info:', error);
-        });
+        if (!currentUser) return;
+        
+        const totalSize = samplePDFs.reduce((sum, pdf) => sum + pdf.size, 0);
+        const totalFiles = samplePDFs.length;
+        const sizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+        
+        // Calculate localStorage usage
+        const storageSize = JSON.stringify(samplePDFs).length;
+        const storageMB = (storageSize / (1024 * 1024)).toFixed(2);
+        
+        const storageElement = document.getElementById('storageUsage');
+        if (storageElement) {
+            storageElement.innerHTML = `
+                Storage: ${sizeMB}MB (${totalFiles} files)<br>
+                <small>LocalStorage: ${storageMB}MB used</small>
+                ${storageMB > 4 ? '<br><small style="color: var(--danger-color);">⚠️ Storage nearly full</small>' : ''}
+            `;
+        }
+        
     } catch (error) {
         console.error('Error loading storage info:', error);
+    }
+}
+
+// Clear storage function
+function clearStorageSpace() {
+    if (!confirm('This will remove file preview data to free up space. Files will still be listed but previews may not work. Continue?')) {
+        return;
+    }
+    
+    try {
+        // Remove file_data from all PDFs to save space
+        samplePDFs.forEach(pdf => {
+            if (pdf.file_data) {
+                pdf.file_data = null;
+            }
+        });
+        
+        localStorage.setItem('uploadedPDFs', JSON.stringify(samplePDFs));
+        showSuccess('Storage space cleared! File previews may be limited.');
+        loadStorageInfo();
+    } catch (error) {
+        console.error('Error clearing storage:', error);
+        showError('Failed to clear storage: ' + error.message);
     }
 }
 
@@ -874,19 +1038,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-// Handle form submissions
-document.addEventListener('submit', function(event) {
-    const form = event.target;
-    
-    if (form.id === 'loginForm') {
-        login(event);
-    } else if (form.id === 'uploadForm') {
-        uploadPDF(event);
-    } else if (form.id === 'feedbackForm') {
-        submitComment(event);
-    }
-});
-
 // Window resize handler
 window.addEventListener('resize', function() {
     // Adjust modal sizes if needed
@@ -900,54 +1051,4 @@ window.addEventListener('resize', function() {
             modal.style.margin = '';
         }
     });
-});
-
-// Handle browser back button
-window.addEventListener('popstate', function(event) {
-    // Prevent going back to login if already logged in
-    if (currentUser && document.getElementById('mainApp').style.display === 'block') {
-        event.preventDefault();
-        history.pushState(null, null, location.href);
-    }
-});
-
-// Prevent form resubmission on page refresh
-if (window.history.replaceState) {
-    window.history.replaceState(null, null, window.location.href);
-}
-
-// Error handling for uncaught exceptions
-window.addEventListener('error', function(event) {
-    console.error('Unhandled error:', event.error);
-    showError('An unexpected error occurred. Please try again.');
-});
-
-// Handle unhandled promise rejections
-window.addEventListener('unhandledrejection', function(event) {
-    console.error('Unhandled promise rejection:', event.reason);
-    showError('An unexpected error occurred. Please try again.');
-    event.preventDefault();
-});
-
-// Network status handling
-window.addEventListener('online', function() {
-    showSuccess('Connection restored');
-});
-
-window.addEventListener('offline', function() {
-    showError('Connection lost. Some features may not work.');
-});
-
-// Visibility change handler
-document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible' && currentUser) {
-        // Refresh data when tab becomes visible
-        if (document.getElementById('uploadsTab').classList.contains('active')) {
-            loadPDFs();
-        } else if (document.getElementById('downloadsTab').classList.contains('active')) {
-            loadDownloads();
-        } else if (document.getElementById('commentsTab').classList.contains('active')) {
-            loadComments();
-        }
-    }
 });

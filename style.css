@@ -1,3 +1,4 @@
+
 /* Reset and Base Styles */
 * {
   margin: 0;
@@ -7,6 +8,8 @@
 
 html {
   scroll-behavior: smooth;
+  height: 100%;
+  width: 100%;
 }
 
 :root {
@@ -55,153 +58,6 @@ body.dark-theme .download-item {
   background: #334155;
   border-color: var(--border-color);
   color: var(--text-color);
-}
-
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
-  .container {
-    margin: 10px;
-    padding: 16px;
-    border-radius: 16px;
-  }
-  
-  .app-header {
-    flex-direction: column;
-    gap: 16px;
-    text-align: center;
-  }
-  
-  .nav-tabs {
-    flex-wrap: wrap;
-    gap: 2px;
-  }
-  
-  .tab-btn {
-    padding: 10px 16px;
-    font-size: 14px;
-  }
-  
-  .search-container {
-    flex-direction: column;
-  }
-  
-  .search-container input {
-    min-width: auto;
-  }
-  
-  .pdf-actions {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  
-  .pdf-actions button {
-    padding: 6px 12px;
-    font-size: 11px;
-  }
-  
-  .login-container {
-    padding: 24px;
-    margin: 10px;
-  }
-  
-  .popup-content,
-  .modal-content {
-    width: 95%;
-    margin: 10px;
-  }
-}
-
-/* Login Required Message */
-.login-required {
-  text-align: center;
-  padding: 40px 20px;
-  background: var(--light-color);
-  border-radius: 12px;
-  border: 2px dashed var(--border-color);
-  margin: 20px 0;
-}
-
-.login-required p {
-  color: var(--text-color);
-  font-size: 16px;
-  margin: 0;
-}
-
-/* Loading Overlay */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--primary-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Toast Notifications */
-.toast-notification {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  padding: 16px 20px;
-  border-radius: 8px;
-  color: white;
-  font-weight: 500;
-  box-shadow: var(--shadow-lg);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 400px;
-  animation: slideIn 0.3s ease-out;
-}
-
-.toast-notification.success {
-  background-color: var(--success-color);
-}
-
-.toast-notification.error {
-  background-color: var(--danger-color);
-}
-
-.toast-notification button {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0;
-  margin-left: auto;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
 }
 
 /* Welcome Popup */
@@ -478,6 +334,53 @@ body.dark-theme .download-item {
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--primary-color);
+}
+
+/* Toast Notifications */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 400px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-notification.success {
+  background-color: var(--success-color);
+}
+
+.toast-notification.error {
+  background-color: var(--danger-color);
+}
+
+.toast-notification button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 /* Modal Styles */
@@ -1364,7 +1267,53 @@ body.dark-theme .theme-toggle {
   height: 600px;
 }
 
-/* Responsive Design */
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Login Required Message */
+.login-required {
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--light-color);
+  border-radius: 12px;
+  border: 2px dashed var(--border-color);
+  margin: 20px 0;
+}
+
+.login-required p {
+  color: var(--text-color);
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Mobile Responsiveness */
 @media (max-width: 768px) {
   .container {
     margin: 10px;
@@ -1426,10 +1375,6 @@ body.dark-theme .theme-toggle {
     align-items: stretch;
   }
   
-  .about-content {
-    grid-template-columns: 1fr;
-  }
-  
   .modal-content {
     width: 95%;
     margin: 20px;
@@ -1465,32 +1410,15 @@ body.dark-theme .theme-toggle {
   }
 }
 
-/* Print Styles */
-@media print {
-  body {
-    background: white;
-  }
-  
-  .popup-overlay,
-  .modal-overlay,
-  .loading-overlay {
-    display: none !important;
-  }
-  
-  .login-section {
-    display: none !important;
-  }
-  
-  .header-controls,
-  .nav-tabs,
-  .upload-section,
-  .pdf-actions,
-  .download-actions {
-    display: none !important;
-  }
+/* Accessibility */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
 }
 
-/* Accessibility Improvements */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1500,59 +1428,4 @@ body.dark-theme .theme-toggle {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
-}
-
-button:focus,
-input:focus,
-select:focus,
-textarea:focus {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 2px;
-}
-
-.error-message {
-  color: var(--danger-color);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.success-message {
-  color: var(--success-color);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-/* Animation Classes */
-.fade-in {
-  animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.slide-up {
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-.pulse {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
 }
