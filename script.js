@@ -1,744 +1,953 @@
-
-// Enhanced PDF storage with all new features
-let pdfStorage = [];
-let downloadHistory = [];
-let commentsStorage = [];
-let isLoggedIn = false;
-let currentUser = '';
+// Global Variables
+let currentUser = null;
 let isAdmin = false;
-let currentTheme = 'light';
+let currentPreviewFile = null;
+let isDarkTheme = false;
 
-// Admin users list
-const adminUsers = ['admin', 'ayush', 'AYUSH KUMAR', 'administrator', 'ak763145918@gmail.com'];
-
-// Initialize storage and theme
-function initializeStorage() {
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
     try {
-        const stored = localStorage.getItem('pdfStorage');
-        if (stored) pdfStorage = JSON.parse(stored);
-        
-        const downloads = localStorage.getItem('downloadHistory');
-        if (downloads) downloadHistory = JSON.parse(downloads);
-        
-        const comments = localStorage.getItem('commentsStorage');
-        if (comments) commentsStorage = JSON.parse(comments);
-        
-        const theme = localStorage.getItem('theme') || 'light';
-        setTheme(theme);
-        
-        const userData = localStorage.getItem('userData');
-        if (userData) {
-            const user = JSON.parse(userData);
-            currentUser = user.username;
-            isAdmin = user.isAdmin || false;
-            isLoggedIn = true;
-            showMainApp();
-        }
-        
-        updateStorageUsage();
+        initializeApp();
     } catch (error) {
-        console.error('Error loading storage:', error);
-        pdfStorage = [];
-        downloadHistory = [];
-        commentsStorage = [];
+        console.error('Error initializing app:', error);
+        showError('Failed to initialize application: ' + error.message);
     }
-}
+});
 
-// Theme Management
-function toggleTheme() {
-    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-    setTheme(currentTheme);
-    localStorage.setItem('theme', currentTheme);
-}
-
-function setTheme(theme) {
-    currentTheme = theme;
-    document.documentElement.setAttribute('data-theme', theme);
-    const themeIcon = document.getElementById('themeIcon');
-    if (themeIcon) {
-        themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
+function initializeApp() {
+    // Load theme preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        const themeIcon = document.getElementById('themeIcon');
+        if (themeIcon) {
+            themeIcon.textContent = '☀️';
+        }
+        isDarkTheme = true;
     }
+    
+    // Show welcome popup on first visit
+    const hasVisited = localStorage.getItem('hasVisited');
+    if (!hasVisited) {
+        showWelcomePopup();
+        localStorage.setItem('hasVisited', 'true');
+    } else {
+        closeWelcomePopup();
+    }
+    
+    // Check if user is already logged in
+    checkLoginStatus();
 }
 
-// Welcome popup functions
+function checkLoginStatus() {
+    // This would normally check server session, but we'll handle it client-side for now
+    // In production, this should be a server-side check
+    showMainPage();
+}
+
+// Welcome Popup Functions
 function showWelcomePopup() {
-    if (!localStorage.getItem('welcomeShown') || !isLoggedIn) {
-        document.getElementById('welcomePopup').style.display = 'flex';
-        if (isLoggedIn) localStorage.setItem('welcomeShown', 'true');
+    const popup = document.getElementById('welcomePopup');
+    if (popup) {
+        popup.style.display = 'flex';
     }
 }
 
 function closeWelcomePopup() {
-    document.getElementById('welcomePopup').style.display = 'none';
+    const popup = document.getElementById('welcomePopup');
+    if (popup) {
+        popup.style.display = 'none';
+    }
 }
 
-// Enhanced Login functions
-function login() {
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
-    
-    if (!username || !password) {
-        showStatus('Please enter both email and password', 'error');
-        return;
+// Theme Toggle
+function toggleTheme() {
+    try {
+        const body = document.body;
+        const themeIcon = document.getElementById('themeIcon');
+        
+        if (body.classList.contains('dark-theme')) {
+            body.classList.remove('dark-theme');
+            themeIcon.textContent = '🌙';
+            localStorage.setItem('theme', 'light');
+            isDarkTheme = false;
+        } else {
+            body.classList.add('dark-theme');
+            themeIcon.textContent = '☀️';
+            localStorage.setItem('theme', 'dark');
+            isDarkTheme = true;
+        }
+    } catch (error) {
+        console.error('Error toggling theme:', error);
+    }
+}
+
+// Authentication Functions
+function togglePasswordVisibility() {
+    try {
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.getElementById('passwordToggleIcon');
+        
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleIcon.textContent = '🙈';
+        } else {
+            passwordInput.type = 'password';
+            toggleIcon.textContent = '👁️';
+        }
+    } catch (error) {
+        console.error('Error toggling password visibility:', error);
+    }
+}
+
+function login(event) {
+    if (event) {
+        event.preventDefault();
     }
     
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(username)) {
-        showStatus('Please enter a valid email address', 'error');
-        return;
+    try {
+        showLoading(true);
+        
+        const form = document.getElementById('loginForm');
+        const formData = new FormData(form);
+        
+        fetch('/login', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentUser = data.user_email;
+                isAdmin = data.is_admin;
+                showMainApp();
+                showSuccess('Login successful!');
+            } else {
+                showError(data.message || 'Login failed');
+            }
+        })
+        .catch(error => {
+            console.error('Login error:', error);
+            showError('Login failed: ' + error.message);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        showError('Login failed: ' + error.message);
+        showLoading(false);
     }
-    
-    // Check specific admin credentials
-    if (username === 'ak763145918@gmail.com' && password === '76730') {
-        currentUser = username;
-        isLoggedIn = true;
-        isAdmin = true;
-        showStatus('Admin login successful!', 'success');
-    } else {
-        // Demo login for other users
-        currentUser = username;
-        isLoggedIn = true;
-        isAdmin = false; // Only the specific admin account gets admin privileges
-        showStatus('Login successful!', 'success');
-    }
-    
-    localStorage.setItem('userData', JSON.stringify({
-        username: currentUser,
-        loginTime: new Date().toISOString(),
-        isAdmin: isAdmin
-    }));
-    
-    setTimeout(() => {
-        showMainApp();
-        showWelcomePopup();
-    }, 1000);
 }
 
 function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        localStorage.removeItem('userData');
-        localStorage.removeItem('welcomeShown');
-        isLoggedIn = false;
-        currentUser = '';
-        isAdmin = false;
-        document.getElementById('loginSection').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
-        document.getElementById('username').value = '';
-        document.getElementById('password').value = '';
+    try {
+        showLoading(true);
+        
+        fetch('/logout', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentUser = null;
+                isAdmin = false;
+                showMainPage(); // Return to main page with login button
+                showSuccess('Logged out successfully!');
+            } else {
+                showError('Logout failed');
+            }
+        })
+        .catch(error => {
+            console.error('Logout error:', error);
+            showError('Logout failed: ' + error.message);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+        showError('Logout failed: ' + error.message);
+        showLoading(false);
     }
 }
 
-// Password visibility toggle
-function togglePasswordVisibility() {
-    const passwordInput = document.getElementById('password');
-    const toggleIcon = document.getElementById('passwordToggleIcon');
+function showMainPage() {
+    const loginSection = document.getElementById('loginSection');
+    const mainApp = document.getElementById('mainApp');
+    const currentUserElement = document.getElementById('currentUser');
+    const uploadSection = document.getElementById('uploadSection');
+    const loginButton = document.getElementById('loginButton');
+    const userInfo = document.getElementById('userInfo');
     
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleIcon.textContent = '🙈';
+    if (loginSection) loginSection.style.display = 'none';
+    if (mainApp) mainApp.style.display = 'block';
+    
+    // Show login button if not logged in
+    if (!currentUser) {
+        if (loginButton) loginButton.style.display = 'block';
+        if (userInfo) userInfo.style.display = 'none';
+        if (currentUserElement) currentUserElement.textContent = 'Welcome! Please login to access features.';
+        if (uploadSection) uploadSection.style.display = 'none';
+        
+        // Disable interactive features
+        disableFeatures();
     } else {
-        passwordInput.type = 'password';
-        toggleIcon.textContent = '👁️';
+        if (loginButton) loginButton.style.display = 'none';
+        if (userInfo) userInfo.style.display = 'flex';
+        if (currentUserElement) currentUserElement.textContent = `Welcome, ${currentUser}!`;
+        if (uploadSection) uploadSection.style.display = isAdmin ? 'block' : 'none';
+        
+        // Enable interactive features
+        enableFeatures();
+        loadPDFs();
+        loadDownloads();
+        loadComments();
+        loadStorageInfo();
     }
 }
 
-// Forgot password functionality
+function showLoginSection() {
+    const loginSection = document.getElementById('loginSection');
+    const mainApp = document.getElementById('mainApp');
+    
+    if (loginSection) loginSection.style.display = 'flex';
+    if (mainApp) mainApp.style.display = 'none';
+}
+
+function disableFeatures() {
+    // Show message for features that require login
+    const pdfList = document.getElementById('pdfList');
+    const downloadsList = document.getElementById('downloadsList');
+    const commentsList = document.getElementById('commentsList');
+    
+    if (pdfList) {
+        pdfList.innerHTML = '<div class="login-required"><p>Please login to view and manage PDF files.</p></div>';
+    }
+    if (downloadsList) {
+        downloadsList.innerHTML = '<div class="login-required"><p>Please login to view download history.</p></div>';
+    }
+    if (commentsList) {
+        commentsList.innerHTML = '<div class="login-required"><p>Please login to view and submit feedback.</p></div>';
+    }
+}
+
+function enableFeatures() {
+    // Features will be enabled when data is loaded
+}
+
+function showMainApp() {
+    // After successful login, update the main page to show user features
+    showMainPage();
+}
+
+// Forgot Password Functions
 function showForgotPassword() {
-    document.getElementById('forgotPasswordModal').style.display = 'flex';
+    const modal = document.getElementById('forgotPasswordModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
 }
 
 function closeForgotPassword() {
-    document.getElementById('forgotPasswordModal').style.display = 'none';
-    document.getElementById('resetEmail').value = '';
+    const modal = document.getElementById('forgotPasswordModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 function sendPasswordReset() {
     const email = document.getElementById('resetEmail').value.trim();
-    
     if (!email) {
-        showStatus('Please enter your email address', 'error');
+        showError('Please enter your email address');
         return;
     }
     
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showStatus('Please enter a valid email address', 'error');
-        return;
-    }
-    
-    // Simulate sending reset email
-    showStatus('Password reset instructions sent to your email!', 'success');
-    setTimeout(() => {
-        closeForgotPassword();
-    }, 2000);
+    // Simulate password reset
+    showSuccess('Password reset instructions sent to your email!');
+    closeForgotPassword();
 }
 
-function showMainApp() {
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('mainApp').style.display = 'block';
-    
-    const userLabel = isAdmin ? `${currentUser} (Admin)` : currentUser;
-    document.getElementById('currentUser').textContent = `Welcome, ${userLabel}!`;
-    
-    // Show upload section only for admin users
-    const uploadSection = document.getElementById('uploadSection');
-    if (uploadSection) {
-        uploadSection.style.display = isAdmin ? 'block' : 'none';
-        console.log('Admin status:', isAdmin, 'Upload section display:', uploadSection.style.display);
-    }
-    
-    // Update comments tab for admin
-    const commentsTab = document.querySelector('[onclick="showTab(\'comments\')"]');
-    const commentsTitle = document.getElementById('commentsTitle');
-    const commentForm = document.getElementById('commentForm');
-    const commentsDisplayTitle = document.getElementById('commentsDisplayTitle');
-    
-    if (isAdmin) {
-        commentsTab.textContent = '📥 User Feedback';
-        commentsTitle.textContent = '📥 User Feedback Management';
-        commentForm.style.display = 'none';
-        commentsDisplayTitle.textContent = '📋 All User Feedback';
-    } else {
-        commentsTab.textContent = '💬 Feedback';
-        commentsTitle.textContent = '💬 Share Your Feedback';
-        commentForm.style.display = 'block';
-        commentsDisplayTitle.textContent = '📋 Recent Feedback';
-    }
-    
-    loadPDFs();
-    loadDownloadHistory();
-    loadComments();
-    initializeLogo();
-}
-
-// Tab Management
+// Tab Navigation
 function showTab(tabName) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    
-    // Show selected tab
-    document.getElementById(tabName + 'Tab').classList.add('active');
-    event.target.classList.add('active');
-    
-    // Load tab-specific content
-    if (tabName === 'downloads') {
-        loadDownloadHistory();
-    } else if (tabName === 'comments') {
-        loadComments();
-    }
-}
-
-// Enhanced file upload
-function uploadPDF() {
-    console.log('Upload function called, isAdmin:', isAdmin);
-    
-    if (!isAdmin) {
-        showStatus('Only admin users can upload files', 'error');
-        return;
-    }
-    
-    const fileInput = document.getElementById('pdfFile');
-    const statusDiv = document.getElementById('uploadStatus');
-    const categorySelect = document.getElementById('categorySelect');
-    const file = fileInput.files[0];
-    
-    if (!file) {
-        showStatus('Please select a PDF file', 'error');
-        return;
-    }
-    
-    if (file.type !== 'application/pdf') {
-        showStatus('Please select a valid PDF file', 'error');
-        return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024) {
-        showStatus('File too large. Please select a PDF smaller than 5MB.', 'error');
-        return;
-    }
-    
-    // Check storage before proceeding
-    const currentStorage = JSON.stringify(pdfStorage);
-    const availableSpace = 4500000 - new Blob([currentStorage]).size;
-    
-    if (file.size > availableSpace) {
-        showStatus(`Not enough storage space. Available: ${formatFileSize(availableSpace)}, Required: ${formatFileSize(file.size)}`, 'error');
-        return;
-    }
-    
-    showStatus('Uploading PDF...', 'loading');
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const pdfData = {
-                id: Date.now().toString(),
-                name: file.name,
-                size: file.size,
-                category: categorySelect.value,
-                data: e.target.result,
-                uploadDate: new Date().toISOString(),
-                uploadedBy: currentUser
-            };
-            
-            const updatedStorage = [...pdfStorage, pdfData];
-            const storageString = JSON.stringify(updatedStorage);
-            
-            if (storageString.length > 4500000) {
-                showStatus('Storage limit reached. Please delete some files first.', 'error');
-                return;
-            }
-            
-            localStorage.setItem('pdfStorage', storageString);
-            pdfStorage = updatedStorage;
-            
-            showStatus(`PDF "${file.name}" uploaded successfully!`, 'success');
-            fileInput.value = '';
-            loadPDFs();
-            updateStorageUsage();
-            
-            const logo = document.getElementById('logo');
-            logo.click();
-            
-        } catch (error) {
-            console.error('Upload error:', error);
-            if (error.name === 'QuotaExceededError') {
-                showStatus('Storage quota exceeded. Please delete some files first.', 'error');
-            } else {
-                showStatus('Error uploading file. Please try again.', 'error');
-            }
+    try {
+        // Hide all tab contents
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Remove active class from all tab buttons
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        tabButtons.forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        // Show selected tab content
+        const selectedTab = document.getElementById(tabName + 'Tab');
+        if (selectedTab) {
+            selectedTab.classList.add('active');
         }
-    };
-    
-    reader.onerror = function() {
-        showStatus('Error reading file', 'error');
-    };
-    
-    reader.readAsDataURL(file);
+        
+        // Add active class to clicked button
+        const clickedButton = event.target;
+        if (clickedButton) {
+            clickedButton.classList.add('active');
+        }
+        
+        // Load data for specific tabs
+        if (tabName === 'downloads') {
+            loadDownloads();
+        } else if (tabName === 'comments') {
+            loadComments();
+        }
+    } catch (error) {
+        console.error('Error showing tab:', error);
+    }
 }
 
-// Search and filter functionality
+// File Upload Functions
+function uploadPDF(event) {
+    if (event) {
+        event.preventDefault();
+    }
+    
+    try {
+        if (!isAdmin) {
+            showError('Upload permission denied. Admin access required.');
+            return;
+        }
+        
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('pdfFile');
+        const statusDiv = document.getElementById('uploadStatus');
+        
+        if (!fileInput.files[0]) {
+            showError('Please select a PDF file');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        if (file.type !== 'application/pdf') {
+            showError('Please select a valid PDF file');
+            return;
+        }
+        
+        if (file.size > 50 * 1024 * 1024) { // 50MB limit
+            showError('File size too large. Maximum size is 50MB.');
+            return;
+        }
+        
+        showLoading(true);
+        statusDiv.innerHTML = '<div class="loading-spinner"></div> Uploading...';
+        
+        const formData = new FormData(form);
+        
+        fetch('/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message || 'File uploaded successfully!');
+                form.reset();
+                statusDiv.innerHTML = '';
+                loadPDFs(); // Refresh file list
+            } else {
+                showError(data.message || 'Upload failed');
+                statusDiv.innerHTML = '';
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            showError('Upload failed: ' + error.message);
+            statusDiv.innerHTML = '';
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    } catch (error) {
+        console.error('Upload error:', error);
+        showError('Upload failed: ' + error.message);
+        showLoading(false);
+    }
+}
+
+// File Management Functions
+function loadPDFs() {
+    try {
+        const category = document.getElementById('categoryFilter').value;
+        const search = document.getElementById('searchInput').value;
+        
+        const params = new URLSearchParams();
+        if (category) params.append('category', category);
+        if (search) params.append('search', search);
+        
+        fetch('/files?' + params.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayPDFs(data.files);
+            } else {
+                showError(data.message || 'Failed to load files');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading PDFs:', error);
+            showError('Failed to load files: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Error loading PDFs:', error);
+        showError('Failed to load files: ' + error.message);
+    }
+}
+
+function displayPDFs(files) {
+    const pdfList = document.getElementById('pdfList');
+    if (!pdfList) return;
+    
+    if (files.length === 0) {
+        pdfList.innerHTML = '<p class="text-center text-muted">No PDF files found.</p>';
+        return;
+    }
+    
+    pdfList.innerHTML = files.map(file => `
+        <div class="pdf-item">
+            <div class="pdf-header">
+                <div class="pdf-info">
+                    <h3>${escapeHtml(file.filename)}</h3>
+                    <div class="pdf-meta">
+                        <span>📅 ${file.upload_date}</span>
+                        <span>📊 ${formatFileSize(file.size)}</span>
+                        <span>📈 ${file.download_count} downloads</span>
+                    </div>
+                </div>
+                <div class="pdf-category">${file.category}</div>
+            </div>
+            <div class="pdf-actions">
+                <button class="btn-preview" onclick="previewPDF(${file.id}, '${escapeHtml(file.filename)}')">
+                    👁️ Preview
+                </button>
+                <button class="btn-download" onclick="downloadPDF(${file.id}, '${escapeHtml(file.filename)}')">
+                    📥 Download
+                </button>
+                ${isAdmin ? `<button class="btn-delete" onclick="deletePDF(${file.id})">🗑️ Delete</button>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
 function searchPDFs() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-    const categoryFilter = document.getElementById('categoryFilter').value;
-    
-    let filteredPDFs = pdfStorage.filter(pdf => {
-        const matchesSearch = pdf.name.toLowerCase().includes(searchTerm);
-        const matchesCategory = !categoryFilter || pdf.category === categoryFilter;
-        return matchesSearch && matchesCategory;
-    });
-    
-    displayPDFs(filteredPDFs);
+    loadPDFs();
 }
 
 function filterByCategory() {
-    searchPDFs();
+    loadPDFs();
 }
 
-// Enhanced PDF display
-function loadPDFs() {
-    displayPDFs(pdfStorage);
-    updateStorageUsage();
+function previewPDF(fileId, filename) {
+    try {
+        const modal = document.getElementById('previewModal');
+        const iframe = document.getElementById('previewFrame');
+        const title = document.getElementById('previewTitle');
+        const loading = document.getElementById('previewLoading');
+        
+        if (!modal || !iframe || !title || !loading) {
+            showError('Preview modal not found');
+            return;
+        }
+        
+        currentPreviewFile = fileId;
+        title.textContent = `Preview: ${filename}`;
+        
+        // Show modal and loading
+        modal.style.display = 'flex';
+        loading.style.display = 'block';
+        iframe.style.display = 'none';
+        
+        // Load PDF
+        iframe.src = `/preview/${fileId}`;
+        
+        iframe.onload = function() {
+            loading.style.display = 'none';
+            iframe.style.display = 'block';
+        };
+        
+        iframe.onerror = function() {
+            loading.style.display = 'none';
+            showError('Failed to load PDF preview');
+            closePreview();
+        };
+    } catch (error) {
+        console.error('Preview error:', error);
+        showError('Failed to preview PDF: ' + error.message);
+    }
 }
 
-function displayPDFs(pdfs) {
-    const pdfList = document.getElementById('pdfList');
+function closePreview() {
+    const modal = document.getElementById('previewModal');
+    const iframe = document.getElementById('previewFrame');
     
-    if (pdfs.length === 0) {
-        pdfList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">📂 No PDFs found. Upload some documents to get started!</div>';
+    if (modal) {
+        modal.style.display = 'none';
+    }
+    
+    if (iframe) {
+        iframe.src = '';
+    }
+    
+    currentPreviewFile = null;
+}
+
+function downloadCurrentPDF() {
+    if (currentPreviewFile) {
+        window.open(`/download/${currentPreviewFile}`, '_blank');
+    }
+}
+
+function downloadPDF(fileId, filename) {
+    try {
+        // Track download
+        window.open(`/download/${fileId}`, '_blank');
+        
+        // Refresh downloads list if on downloads tab
+        if (document.getElementById('downloadsTab').classList.contains('active')) {
+            setTimeout(() => {
+                loadDownloads();
+            }, 1000);
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+        showError('Failed to download PDF: ' + error.message);
+    }
+}
+
+function deletePDF(fileId) {
+    if (!isAdmin) {
+        showError('Delete permission denied. Admin access required.');
         return;
     }
     
-    pdfList.innerHTML = pdfs.map(pdf => {
-        const deleteButton = isAdmin ? `<button class="secondary-btn" onclick="deletePDF('${pdf.id}')">🗑️ Delete</button>` : '';
-        const categoryIcons = {
-            'mocktest': '📝',
-            'ncert': '📚',
-            'pyqs': '📄',
-            'pw-notes': '📖',
-            'kgs-notes': '📓',
-            'others': '📁'
-        };
-        
-        return `
-            <div class="pdf-item" data-category="${pdf.category}">
-                <div class="pdf-info">
-                    <div class="pdf-name">${categoryIcons[pdf.category] || '📁'} ${pdf.name}</div>
-                    <div class="pdf-size">${formatFileSize(pdf.size)} • ${formatDate(pdf.uploadDate)}</div>
-                    <div class="pdf-category ${pdf.category}">${pdf.category.replace('-', ' ').toUpperCase()}</div>
-                </div>
-                <div class="pdf-actions">
-                    <button class="primary-btn" onclick="previewPDF('${pdf.id}')">👁️ Preview</button>
-                    <button class="success-btn" onclick="downloadPDF('${pdf.id}')">📥 Download</button>
-                    ${deleteButton}
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// Download functionality with history tracking
-function downloadPDF(id) {
-    const pdf = pdfStorage.find(p => p.id === id);
-    if (!pdf) {
-        showStatus('PDF not found', 'error');
+    if (!confirm('Are you sure you want to delete this PDF?')) {
         return;
     }
     
     try {
-        const link = document.createElement('a');
-        link.href = pdf.data;
-        link.download = pdf.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        showLoading(true);
         
-        // Add to download history
-        const downloadRecord = {
-            id: Date.now().toString(),
-            pdfId: pdf.id,
-            name: pdf.name,
-            category: pdf.category,
-            downloadDate: new Date().toISOString(),
-            downloadedBy: currentUser
-        };
-        
-        downloadHistory.unshift(downloadRecord);
-        localStorage.setItem('downloadHistory', JSON.stringify(downloadHistory));
-        
-        showStatus(`Downloaded "${pdf.name}"`, 'success');
-        
+        fetch(`/delete/${fileId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message || 'File deleted successfully');
+                loadPDFs(); // Refresh file list
+            } else {
+                showError(data.message || 'Delete failed');
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            showError('Delete failed: ' + error.message);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
     } catch (error) {
-        showStatus('Error downloading file', 'error');
+        console.error('Delete error:', error);
+        showError('Delete failed: ' + error.message);
+        showLoading(false);
     }
 }
 
-// Download History Management
-function loadDownloadHistory() {
-    displayDownloads(downloadHistory);
+function toggleFullscreen() {
+    const iframe = document.getElementById('previewFrame');
+    if (!iframe) return;
+    
+    if (iframe.requestFullscreen) {
+        iframe.requestFullscreen();
+    } else if (iframe.webkitRequestFullscreen) {
+        iframe.webkitRequestFullscreen();
+    } else if (iframe.msRequestFullscreen) {
+        iframe.msRequestFullscreen();
+    }
+}
+
+// Downloads Functions
+function loadDownloads() {
+    try {
+        const filter = document.getElementById('downloadsFilter').value;
+        const params = new URLSearchParams();
+        if (filter) params.append('filter', filter);
+        
+        fetch('/downloads?' + params.toString())
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayDownloads(data.downloads);
+            } else {
+                showError(data.message || 'Failed to load downloads');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading downloads:', error);
+            showError('Failed to load downloads: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Error loading downloads:', error);
+        showError('Failed to load downloads: ' + error.message);
+    }
 }
 
 function displayDownloads(downloads) {
     const downloadsList = document.getElementById('downloadsList');
+    if (!downloadsList) return;
     
     if (downloads.length === 0) {
-        downloadsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">📥 No downloads yet. Download some PDFs to see them here!</div>';
+        downloadsList.innerHTML = '<p class="text-center text-muted">No downloads found.</p>';
         return;
     }
     
     downloadsList.innerHTML = downloads.map(download => `
         <div class="download-item">
             <div class="download-info">
-                <div class="download-name">📄 ${download.name}</div>
-                <div class="download-time">${formatDate(download.downloadDate)}</div>
+                <h4>${escapeHtml(download.filename)}</h4>
+                <div class="download-meta">
+                    <span>📅 ${download.download_date}</span>
+                    <span class="pdf-category">${download.category}</span>
+                </div>
             </div>
             <div class="download-actions">
-                <button class="primary-btn" onclick="redownloadPDF('${download.pdfId}')">📥 Download Again</button>
+                <button onclick="downloadPDF(${download.file_id}, '${escapeHtml(download.filename)}')">
+                    📥 Download Again
+                </button>
             </div>
         </div>
     `).join('');
 }
 
-function redownloadPDF(pdfId) {
-    downloadPDF(pdfId);
-}
-
 function filterDownloads() {
-    const filter = document.getElementById('downloadsFilter').value;
-    const now = new Date();
-    let filteredDownloads = downloadHistory;
-    
-    if (filter === 'today') {
-        filteredDownloads = downloadHistory.filter(d => {
-            const downloadDate = new Date(d.downloadDate);
-            return downloadDate.toDateString() === now.toDateString();
-        });
-    } else if (filter === 'week') {
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        filteredDownloads = downloadHistory.filter(d => new Date(d.downloadDate) >= weekAgo);
-    } else if (filter === 'month') {
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        filteredDownloads = downloadHistory.filter(d => new Date(d.downloadDate) >= monthAgo);
-    }
-    
-    displayDownloads(filteredDownloads);
+    loadDownloads();
 }
 
 function clearDownloadHistory() {
-    if (confirm('Are you sure you want to clear your download history?')) {
-        downloadHistory = [];
-        localStorage.setItem('downloadHistory', JSON.stringify(downloadHistory));
-        loadDownloadHistory();
-        showStatus('Download history cleared', 'success');
-    }
-}
-
-// Comments System
-function submitComment() {
-    const commentText = document.getElementById('commentText').value.trim();
-    const commentCategory = document.getElementById('commentCategory').value;
-    
-    if (!commentText) {
-        showStatus('Please enter your feedback', 'error');
+    if (!confirm('Are you sure you want to clear your download history?')) {
         return;
     }
     
-    const comment = {
-        id: Date.now().toString(),
-        text: commentText,
-        category: commentCategory,
-        user: currentUser,
-        date: new Date().toISOString(),
-        isAdmin: isAdmin
-    };
+    try {
+        showLoading(true);
+        
+        fetch('/clear_downloads', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message || 'Download history cleared');
+                loadDownloads();
+            } else {
+                showError(data.message || 'Failed to clear history');
+            }
+        })
+        .catch(error => {
+            console.error('Clear downloads error:', error);
+            showError('Failed to clear history: ' + error.message);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    } catch (error) {
+        console.error('Clear downloads error:', error);
+        showError('Failed to clear history: ' + error.message);
+        showLoading(false);
+    }
+}
+
+// Comments Functions
+function submitComment(event) {
+    if (event) {
+        event.preventDefault();
+    }
     
-    commentsStorage.unshift(comment);
-    localStorage.setItem('commentsStorage', JSON.stringify(commentsStorage));
-    
-    document.getElementById('commentText').value = '';
-    showStatus('Feedback submitted successfully!', 'success');
-    loadComments();
+    try {
+        const form = document.getElementById('feedbackForm');
+        const formData = new FormData(form);
+        
+        if (!formData.get('text').trim()) {
+            showError('Please enter your feedback');
+            return;
+        }
+        
+        showLoading(true);
+        
+        fetch('/comments', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message || 'Feedback submitted successfully');
+                form.reset();
+                loadComments();
+            } else {
+                showError(data.message || 'Failed to submit feedback');
+            }
+        })
+        .catch(error => {
+            console.error('Comment submission error:', error);
+            showError('Failed to submit feedback: ' + error.message);
+        })
+        .finally(() => {
+            showLoading(false);
+        });
+    } catch (error) {
+        console.error('Comment submission error:', error);
+        showError('Failed to submit feedback: ' + error.message);
+        showLoading(false);
+    }
 }
 
 function loadComments() {
-    displayComments(commentsStorage);
+    try {
+        fetch('/comments')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayComments(data.comments);
+            } else {
+                showError(data.message || 'Failed to load comments');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading comments:', error);
+            showError('Failed to load comments: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Error loading comments:', error);
+        showError('Failed to load comments: ' + error.message);
+    }
 }
 
 function displayComments(comments) {
     const commentsList = document.getElementById('commentsList');
+    if (!commentsList) return;
     
-    // Filter comments based on user role
-    let displayComments = comments;
-    if (!isAdmin) {
-        // Regular users see only their own comments and a few recent ones
-        displayComments = comments.filter(c => c.user === currentUser || comments.indexOf(c) < 5);
-    }
-    
-    if (displayComments.length === 0) {
-        commentsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">💬 No feedback yet. Be the first to share your thoughts!</div>';
+    if (comments.length === 0) {
+        commentsList.innerHTML = '<p class="text-center text-muted">No feedback found.</p>';
         return;
     }
     
-    commentsList.innerHTML = displayComments.map(comment => `
+    commentsList.innerHTML = comments.map(comment => `
         <div class="comment-item">
             <div class="comment-header">
-                <span class="comment-user">${comment.user} ${comment.isAdmin ? '(Admin)' : ''}</span>
-                <span class="comment-category ${comment.category}">${comment.category}</span>
+                <div class="comment-user">${escapeHtml(comment.user_email)}</div>
+                <div class="comment-date">${comment.created_at}</div>
             </div>
-            <div class="comment-text">${comment.text}</div>
-            <div class="comment-time">${formatDate(comment.date)}</div>
+            <div class="comment-category">${comment.category}</div>
+            <div class="comment-text">${escapeHtml(comment.text)}</div>
+            ${comment.is_resolved ? '<div class="comment-resolved">✅ Resolved</div>' : ''}
+            ${comment.admin_reply ? `<div class="admin-reply"><strong>Admin Reply:</strong> ${escapeHtml(comment.admin_reply)}</div>` : ''}
         </div>
     `).join('');
 }
 
-// Enhanced PDF preview
-let currentPreviewPDF = null;
-
-function previewPDF(id) {
-    const pdf = pdfStorage.find(p => p.id === id);
-    if (!pdf) {
-        showStatus('PDF not found', 'error');
-        return;
-    }
-    
-    currentPreviewPDF = pdf;
-    const modal = document.getElementById('previewModal');
-    const previewFrame = document.getElementById('previewFrame');
-    const previewTitle = document.getElementById('previewTitle');
-    const previewLoading = document.getElementById('previewLoading');
-    
-    previewTitle.textContent = `Preview: ${pdf.name}`;
-    
-    if (previewLoading) {
-        previewLoading.style.display = 'flex';
-    }
-    
-    previewFrame.onload = function() {
-        if (previewLoading) {
-            previewLoading.style.display = 'none';
-        }
-    };
-    
-    previewFrame.src = pdf.data;
-    modal.style.display = 'flex';
-}
-
-function closePreview() {
-    const modal = document.getElementById('previewModal');
-    const previewFrame = document.getElementById('previewFrame');
-    const previewLoading = document.getElementById('previewLoading');
-    
-    modal.style.display = 'none';
-    previewFrame.src = '';
-    currentPreviewPDF = null;
-    
-    if (previewLoading) {
-        previewLoading.style.display = 'none';
-    }
-}
-
-function downloadCurrentPDF() {
-    if (currentPreviewPDF) {
-        downloadPDF(currentPreviewPDF.id);
-    }
-}
-
-function toggleFullscreen() {
-    const modal = document.getElementById('previewModal');
-    if (!document.fullscreenElement) {
-        modal.requestFullscreen().catch(err => {
-            showStatus('Fullscreen not supported', 'error');
-        });
-    } else {
-        document.exitFullscreen();
-    }
-}
-
-// Delete PDF function
-function deletePDF(id) {
-    const pdf = pdfStorage.find(p => p.id === id);
-    if (!pdf) {
-        showStatus('PDF not found', 'error');
-        return;
-    }
-    
-    if (!confirm(`Are you sure you want to delete "${pdf.name}"?`)) {
-        return;
-    }
-    
+// Storage Info
+function loadStorageInfo() {
     try {
-        pdfStorage = pdfStorage.filter(p => p.id !== id);
-        localStorage.setItem('pdfStorage', JSON.stringify(pdfStorage));
-        
-        showStatus('PDF deleted successfully', 'success');
-        loadPDFs();
-        updateStorageUsage();
-    } catch (error) {
-        showStatus('Error deleting file', 'error');
-    }
-}
-
-// Storage usage calculation
-function updateStorageUsage() {
-    try {
-        const storageString = JSON.stringify(pdfStorage);
-        const usedBytes = new Blob([storageString]).size;
-        const maxBytes = 5000000;
-        const usagePercent = Math.round((usedBytes / maxBytes) * 100);
-        
-        const storageElement = document.getElementById('storageUsage');
-        if (storageElement) {
-            storageElement.textContent = `Storage: ${usagePercent}% (${formatFileSize(usedBytes)})`;
-            
-            if (usagePercent > 80) {
-                storageElement.style.color = 'var(--secondary-color)';
-            } else if (usagePercent > 60) {
-                storageElement.style.color = 'var(--warning-color)';
-            } else {
-                storageElement.style.color = 'var(--success-color)';
+        fetch('/storage_info')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const storageElement = document.getElementById('storageUsage');
+                if (storageElement) {
+                    storageElement.textContent = `Storage: ${data.total_size_mb}MB (${data.total_files} files)`;
+                }
             }
-        }
+        })
+        .catch(error => {
+            console.error('Error loading storage info:', error);
+        });
     } catch (error) {
-        console.error('Error calculating storage usage:', error);
+        console.error('Error loading storage info:', error);
     }
 }
 
-// Status display
-function showStatus(message, type) {
-    const statusDiv = document.getElementById('uploadStatus');
-    if (statusDiv) {
-        statusDiv.textContent = message;
-        statusDiv.className = type;
+// Utility Functions
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = show ? 'flex' : 'none';
+    }
+}
+
+function showError(message) {
+    const toast = document.getElementById('errorToast');
+    const messageElement = document.getElementById('errorMessage');
+    
+    if (toast && messageElement) {
+        messageElement.textContent = message;
+        toast.style.display = 'flex';
         
-        if (type === 'success' || type === 'error') {
-            setTimeout(() => {
-                statusDiv.textContent = '';
-                statusDiv.className = '';
-            }, 4000);
-        }
+        // Auto hide after 5 seconds
+        setTimeout(() => {
+            hideToast('errorToast');
+        }, 5000);
+    }
+    
+    console.error('Error:', message);
+}
+
+function showSuccess(message) {
+    const toast = document.getElementById('successToast');
+    const messageElement = document.getElementById('successMessage');
+    
+    if (toast && messageElement) {
+        messageElement.textContent = message;
+        toast.style.display = 'flex';
+        
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+            hideToast('successToast');
+        }, 3000);
+    }
+    
+    console.log('Success:', message);
+}
+
+function hideToast(toastId) {
+    const toast = document.getElementById(toastId);
+    if (toast) {
+        toast.style.display = 'none';
     }
 }
 
-// Utility functions
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';
+    
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-}
-
-// Enhanced logo interactions
-function initializeLogo() {
-    const logo = document.getElementById('logo');
-    const pdfPages = document.querySelectorAll('.pdf-page');
-    
-    if (!logo) return;
-    
-    logo.addEventListener('click', function() {
-        this.style.animation = 'pulse 0.6s ease-in-out';
-        
-        setTimeout(() => {
-            this.style.animation = '';
-        }, 600);
-        
-        pdfPages.forEach((page, index) => {
-            setTimeout(() => {
-                page.style.transform = `translateY(-10px) rotate(${(index + 1) * 10}deg)`;
-                setTimeout(() => {
-                    page.style.transform = '';
-                }, 300);
-            }, index * 100);
-        });
-    });
-}
-
-// Event listeners
+// Event Listeners
 document.addEventListener('click', function(event) {
-    const modal = document.getElementById('previewModal');
-    const popup = document.getElementById('welcomePopup');
-    const forgotModal = document.getElementById('forgotPasswordModal');
+    // Close modals when clicking outside
+    if (event.target.classList.contains('modal-overlay')) {
+        if (event.target.id === 'previewModal') {
+            closePreview();
+        } else if (event.target.id === 'forgotPasswordModal') {
+            closeForgotPassword();
+        }
+    }
     
-    if (event.target === modal) closePreview();
-    if (event.target === popup) closeWelcomePopup();
-    if (event.target === forgotModal) closeForgotPassword();
+    // Close popup when clicking outside
+    if (event.target.classList.contains('popup-overlay')) {
+        closeWelcomePopup();
+    }
 });
 
+// Keyboard shortcuts
 document.addEventListener('keydown', function(event) {
+    // Escape key to close modals
     if (event.key === 'Escape') {
         closePreview();
-        closeWelcomePopup();
         closeForgotPassword();
+        closeWelcomePopup();
     }
     
-    if (event.ctrlKey && event.key === 'f') {
+    // Ctrl+/ to toggle theme
+    if (event.ctrlKey && event.key === '/') {
         event.preventDefault();
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) searchInput.focus();
+        toggleTheme();
     }
 });
 
-// Initialize app
-document.addEventListener('DOMContentLoaded', function() {
-    initializeStorage();
+// Handle form submissions
+document.addEventListener('submit', function(event) {
+    const form = event.target;
     
-    if (!isLoggedIn) {
-        document.getElementById('loginSection').style.display = 'flex';
-        document.getElementById('mainApp').style.display = 'none';
-    } else {
-        showMainApp();
-        showWelcomePopup();
+    if (form.id === 'loginForm') {
+        login(event);
+    } else if (form.id === 'uploadForm') {
+        uploadPDF(event);
+    } else if (form.id === 'feedbackForm') {
+        submitComment(event);
+    }
+});
+
+// Window resize handler
+window.addEventListener('resize', function() {
+    // Adjust modal sizes if needed
+    const modals = document.querySelectorAll('.modal-content');
+    modals.forEach(modal => {
+        if (window.innerWidth < 768) {
+            modal.style.width = '95%';
+            modal.style.margin = '20px';
+        } else {
+            modal.style.width = '';
+            modal.style.margin = '';
+        }
+    });
+});
+
+// Handle browser back button
+window.addEventListener('popstate', function(event) {
+    // Prevent going back to login if already logged in
+    if (currentUser && document.getElementById('mainApp').style.display === 'block') {
+        event.preventDefault();
+        history.pushState(null, null, location.href);
+    }
+});
+
+// Prevent form resubmission on page refresh
+if (window.history.replaceState) {
+    window.history.replaceState(null, null, window.location.href);
+}
+
+// Error handling for uncaught exceptions
+window.addEventListener('error', function(event) {
+    console.error('Unhandled error:', event.error);
+    showError('An unexpected error occurred. Please try again.');
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+    console.error('Unhandled promise rejection:', event.reason);
+    showError('An unexpected error occurred. Please try again.');
+    event.preventDefault();
+});
+
+// Network status handling
+window.addEventListener('online', function() {
+    showSuccess('Connection restored');
+});
+
+window.addEventListener('offline', function() {
+    showError('Connection lost. Some features may not work.');
+});
+
+// Visibility change handler
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && currentUser) {
+        // Refresh data when tab becomes visible
+        if (document.getElementById('uploadsTab').classList.contains('active')) {
+            loadPDFs();
+        } else if (document.getElementById('downloadsTab').classList.contains('active')) {
+            loadDownloads();
+        } else if (document.getElementById('commentsTab').classList.contains('active')) {
+            loadComments();
+        }
     }
 });
